@@ -1,0 +1,56 @@
+@import url("https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap");
+
+body {
+  margin: 0;
+  font-family: "Jost", sans-serif;
+  background: #f4f8fb;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+/* Remove legacy styles for old chat layout */
+.container,
+.register,
+.chat-box,
+.member-list,
+.chat-content,
+.chat-messages,
+.send-message,
+.input-message,
+.send-button,
+.member,
+.member.active,
+.member:hover,
+.avatar,
+.avatar.self,
+.message,
+.message-data,
+.message.self {
+  all: unset;
+}
+
+/* Modernize scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e0e7ef;
+}
+::-webkit-scrollbar-thumb {
+  background: #b6c6e3;
+  border-radius: 8px;
+}
+
+/* Utility classes for spacing if needed */
+.mt-2 {
+  margin-top: 2rem;
+}
+.mb-2 {
+  margin-bottom: 2rem;
+}
