@@ -15,7 +15,7 @@ import {
   FaPlusSquare,
 } from "react-icons/fa";
 import { MdMoreVert, MdOutlineAttachFile, MdSend } from "react-icons/md";
-import FileUpload from "./FileUpload";
+// import FileUpload from "./FileUpload";
 import MobileUserListToggle from "./MobileUserListToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaCheck, FaCheckDouble } from "react-icons/fa";
@@ -72,6 +72,7 @@ const ChatRoom = ({ user }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!userData.username) {
       if (stompClient) {
