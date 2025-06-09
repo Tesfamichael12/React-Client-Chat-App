@@ -198,7 +198,7 @@ const ChatRoom = ({ user }) => {
           }
           return [
             ...prevPublicChats,
-            { ...payloadData, type: "STATUS", rawBody: rawMessageBody },
+            { ...payloadData, type: "STATUS", rawMessageBody },
           ];
         });
         break;
@@ -361,7 +361,7 @@ const ChatRoom = ({ user }) => {
     if (!isUserListOpen) return;
     const handleClick = (e) => {
       if (
-        e.target.closest(".user-list-overlay") ||
+        e.target.closest(".user-list-content") || // Changed from .user-list-overlay
         e.target.closest(".mobile-userlist-toggle")
       ) {
         return;
@@ -389,10 +389,8 @@ const ChatRoom = ({ user }) => {
                 className="chat-list-column"
                 style={{
                   marginTop: "-10px",
-                  display: "block",
-                  width: "100vw",
-                  minWidth: 0,
-                  maxWidth: "100vw",
+                  width: "100%", // Changed from 100vw
+                  height: "100%", // Added height
                 }}
               >
                 <div className="chat-list-header">
@@ -555,7 +553,7 @@ const ChatRoom = ({ user }) => {
         </div>
         <div
           className="messages-container"
-          style={{ position: "relative", minHeight: 300 }}
+          style={{ position: "relative" }} // Removed minHeight: 300
         >
           <AnimatePresence initial={false}>
             {(tab === "CHATROOM"
@@ -819,100 +817,102 @@ const ChatRoom = ({ user }) => {
           </motion.div>
         )}
       </div>
-      <div className="info-column">
-        <div className="info-header">
-          <input
-            type="text"
-            placeholder="Search"
-            className="global-search-input"
-          />
-          <div className="header-icon-group">
-            <FaCog />
-            <FaBell />
-            <img
-              src={getAvatarUrl(userData.username)}
-              alt={userData.username}
-              className="user-avatar-icon"
+      {!isMobile && (
+        <div className="info-column">
+          <div className="info-header">
+            <input
+              type="text"
+              placeholder="Search"
+              className="global-search-input"
             />
-          </div>
-        </div>
-        <div className="action-buttons-bar">
-          <button className="action-button active" title="Call">
-            <FaPhoneAlt />
-          </button>
-          <button className="action-button" title="Video Call">
-            <FaVideo />
-          </button>
-          <button className="action-button" title="Add Members">
-            <FaUsers />
-          </button>
-          <button className="action-button" title="More Options">
-            <MdMoreVert />
-          </button>
-        </div>
-        <div className="section-title">
-          <h3>Online Users</h3>
-        </div>
-        <div className="member-list">
-          <div className="member-item" onClick={() => {}}>
-            <div className="member-avatar">
+            <div className="header-icon-group">
+              <FaCog />
+              <FaBell />
               <img
                 src={getAvatarUrl(userData.username)}
                 alt={userData.username}
+                className="user-avatar-icon"
               />
-              <span className="online-indicator" />
             </div>
-            <p className="member-name">You</p>
           </div>
-          {onlineUsers
-            .filter((name) => name !== userData.username)
-            .map((name) => {
-              return (
-                <div
-                  key={name}
-                  className="member-item"
-                  onClick={() => setTab(name)}
-                  title={`Chat with ${name}`}
-                >
-                  <div className="member-avatar">
-                    <img src={getAvatarUrl(name)} alt={name} />
-                    <span className="online-indicator" />
+          <div className="action-buttons-bar">
+            <button className="action-button active" title="Call">
+              <FaPhoneAlt />
+            </button>
+            <button className="action-button" title="Video Call">
+              <FaVideo />
+            </button>
+            <button className="action-button" title="Add Members">
+              <FaUsers />
+            </button>
+            <button className="action-button" title="More Options">
+              <MdMoreVert />
+            </button>
+          </div>
+          <div className="section-title">
+            <h3>Online Users</h3>
+          </div>
+          <div className="member-list">
+            <div className="member-item" onClick={() => {}}>
+              <div className="member-avatar">
+                <img
+                  src={getAvatarUrl(userData.username)}
+                  alt={userData.username}
+                />
+                <span className="online-indicator" />
+              </div>
+              <p className="member-name">You</p>
+            </div>
+            {onlineUsers
+              .filter((name) => name !== userData.username)
+              .map((name) => {
+                return (
+                  <div
+                    key={name}
+                    className="member-item"
+                    onClick={() => setTab(name)}
+                    title={`Chat with ${name}`}
+                  >
+                    <div className="member-avatar">
+                      <img src={getAvatarUrl(name)} alt={name} />
+                      <span className="online-indicator" />
+                    </div>
+                    <p className="member-name">{name}</p>
                   </div>
-                  <p className="member-name">{name}</p>
-                </div>
-              );
-            })}
-        </div>
-        <div className="files-section">
-          <div
-            className="section-title"
-            onClick={() => setIsPhotosExpanded(!isPhotosExpanded)}
-            style={{ cursor: "pointer" }}
-          >
-            Files
-            {isPhotosExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                );
+              })}
           </div>
-          {isPhotosExpanded && (
-            <>
-              <div className="file-category" onClick={() => {}}>
-                <FaPlusSquare />
-                <span>{filesData.photos} photos</span>
-                <FaChevronDown />
-              </div>
-              <div className="file-category" onClick={() => {}}>
-                <FaPaperclip />
-                <span>{filesData.files} files</span>
-                <FaChevronDown />
-              </div>
-              <div className="file-category" onClick={() => {}}>
-                <FaTelegramPlane />
-                <span>{filesData.sharedLinks} shared links</span>
-                <FaChevronDown />
-              </div>
-            </>
-          )}
+          <div className="files-section">
+            <div
+              className="section-title"
+              onClick={() => setIsPhotosExpanded(!isPhotosExpanded)}
+              style={{ cursor: "pointer" }}
+            >
+              Files
+              {isPhotosExpanded ? <FaChevronUp /> : <FaChevronDown />}
+            </div>
+            {isPhotosExpanded && (
+              <>
+                <div className="file-category" onClick={() => {}}>
+                  <FaPlusSquare />
+                  <span>{filesData.photos} photos</span>
+                  <FaChevronDown />
+                </div>
+                <div className="file-category" onClick={() => {}}>
+                  <FaPaperclip />
+                  <span>{filesData.files} files</span>
+                  <FaChevronDown />
+                </div>
+                <div className="file-category" onClick={() => {}}>
+                  <FaTelegramPlane />
+                  <span>{filesData.sharedLinks} shared links</span>
+                  <FaChevronDown />
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

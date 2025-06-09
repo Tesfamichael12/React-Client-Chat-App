@@ -19,7 +19,9 @@
   width: 25%;
   min-width: 280px;
   background-color: #1e293b;
-  padding-top: 23px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .chat-area-column {
@@ -33,6 +35,8 @@
   min-width: 350px;
   border-right: 1px solid #232b3b;
   border-left: 1px solid #232b3b;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .info-column {
@@ -76,6 +80,7 @@
 .chat-list-item-container {
   overflow-y: auto;
   flex-grow: 1;
+  height: 0;
 }
 
 .chat-list-item {
@@ -166,21 +171,18 @@
   flex-direction: column;
   gap: 18px;
   background: transparent;
-  min-height: 300px;
-  max-height: calc(100vh - 220px);
 }
 
 .message-bubble {
   display: flex;
-  align-items: flex-start; /* Align items to the top for avatar alignment */
-  max-width: 70%; /* Adjusted from 75% to give a slightly more defined width */
-  margin-bottom: 10px; /* Increased margin for better separation */
+  align-items: flex-start;
+  max-width: 70%;
+  margin-bottom: 10px;
   background: none;
 }
 .message-bubble.self {
   align-self: flex-end;
-  max-width: 80%; /* Make self messages a bit wider */
-  /* flex-direction: row-reverse; */ /* Removed to place avatar to the right of content, as per DOM order */
+  max-width: 80%;
 }
 
 .message-avatar {
@@ -188,25 +190,23 @@
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  /* margin: 0 10px; */ /* Replaced by specific margins below */
-  margin-top: 0; /* Align with top of the bubble content */
-  flex-shrink: 0; /* Prevent avatar from shrinking */
+
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
-/* Avatar for incoming messages (avatar on the left) */
 .message-bubble:not(.self) > .message-avatar {
   margin-right: 10px;
-  margin-left: 0; /* Explicitly set left margin to 0 */
+  margin-left: 0;
 }
 
-/* Avatar for outgoing messages (avatar on the right) */
 .message-bubble.self > .message-avatar {
   margin-left: 10px;
-  margin-right: 0; /* Explicitly set right margin to 0 */
+  margin-right: 0;
 }
 
 .message-content {
-  padding: 8px 12px; /* Adjusted padding for comfort */
+  padding: 8px 12px;
   border-radius: 18px;
   font-size: 0.9rem;
   color: #f1f5f9;
@@ -214,46 +214,41 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   max-width: 100%;
   position: relative;
-  /* display: flex; */ /* Removed to allow natural flow for text and metadata */
-  /* flex-direction: column; */ /* Removed */
 }
 
-/* Incoming message bubble styling */
 .message-bubble:not(.self) .message-content {
-  background-color: #1e293b; /* Darker background for incoming */
-  border-bottom-left-radius: 3px; /* Sharpen this corner for the tail */
+  background-color: #1e293b;
+  border-bottom-left-radius: 3px;
 }
 
-/* Outgoing message bubble styling */
 .message-bubble.self .message-content {
-  background-color: #2563eb; /* Blue for outgoing */
+  background-color: #2563eb;
   color: #ffffff;
-  border-bottom-right-radius: 3px; /* Sharpen this corner for the tail */
-  padding: 7px 15px; /* Adjusted padding: a bit thinner, more horizontal space */
+  border-bottom-right-radius: 3px;
+  padding: 7px 15px;
 }
 
-/* Message tails using pseudo-elements */
 .message-bubble:not(.self) .message-content::before {
   content: "";
   position: absolute;
-  bottom: 0; /* Align to bottom of the bubble */
+  bottom: 0;
   left: -8px;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 0px 10px 10px 0; /* Triangle shape */
+  border-width: 0px 10px 10px 0;
   border-color: transparent #1e293b transparent transparent;
 }
 
 .message-bubble.self .message-content::after {
   content: "";
   position: absolute;
-  bottom: 0; /* Align to bottom of the bubble */
+  bottom: 0;
   right: -8px;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 0px 0 10px 10px; /* Triangle shape (mirrored) */
+  border-width: 0px 0 10px 10px;
   border-color: transparent transparent transparent #2563eb;
 }
 
@@ -261,48 +256,40 @@
   font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 3px;
-  color: #60a5fa; /* Light blue for sender name */
+  color: #60a5fa;
 }
 
 .message-bubble.self .message-sender-name {
-  color: #c7d2fe; /* Lighter color for "You" on dark blue background */
+  color: #c7d2fe;
 }
 
 .message-text {
   margin: 0;
   padding: 0;
-  /* Add padding to the right to make space for the floated metadata.
-     Adjust the value based on the typical width of your timestamp + status icon. */
   padding-right: 70px;
   line-height: 1.4;
-  font-size: 0.9rem; /* Ensure message text font size */
-  white-space: pre-wrap; /* Preserve line breaks */
+  font-size: 0.9rem;
+  white-space: pre-wrap;
 }
 
 .message-bubble.self .message-text {
-  /* Override padding-right for self messages to give more space for metadata */
   padding-right: 85px;
 }
 
 .message-metadata {
   float: right;
-  clear: right; /* Prevent interference with other floated elements if any */
-  /* Negative margin to pull metadata up to the last line of text.
-     This value might need fine-tuning based on line-height and font sizes.
-     It's relative to the metadata's own font size if using 'em'. */
+  clear: right;
   margin-top: -1.5em;
-  position: relative; /* Allows fine-tuning and ensures it's above pseudo-elements if needed */
-  display: inline-flex; /* Keeps timestamp and status icon aligned and together */
-  align-items: center; /* Vertically align items within metadata */
-  font-size: 0.7rem; /* Smaller font for metadata */
-  color: #94a3b8; /* Default metadata color */
-  white-space: nowrap; /* Prevents the timestamp/status from wrapping */
-  /* align-self: flex-start; */ /* No longer needed due to float */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 .message-bubble.self .message-metadata {
-  color: #cbd5e1; /* Lighter metadata for outgoing messages */
-  /* align-self: flex-end; */ /* No longer needed due to float */
+  color: #cbd5e1;
 }
 
 .message-timestamp {
@@ -312,9 +299,8 @@
 .message-status-text {
   font-weight: 500;
 }
-/* Specific status colors can be added if needed, e.g. for "Seen" */
 .message-status-icon {
-  font-size: 0.85rem; /* Adjust icon size */
+  font-size: 0.85rem;
   margin-left: 3px;
 }
 .message-status-icon.sent {
@@ -322,10 +308,10 @@
 }
 .message-status-icon.delivered {
   color: #86efac;
-} /* Light green */
+}
 .message-status-icon.seen {
   color: #60a5fa;
-} /* Light blue */
+}
 
 .message-content img {
   max-width: 220px;
@@ -354,8 +340,8 @@
   padding: 22px 32px 22px 32px;
   border-top: 1px solid #232b3b;
   background-color: #1e293b;
-  margin-top: 100px;
   box-sizing: unset;
+  flex-shrink: 0;
 }
 
 .message-input {
@@ -391,7 +377,6 @@
   background: #232b3b;
 }
 
-/* File upload area alignment */
 .file-upload {
   display: flex;
   align-items: center;
@@ -505,7 +490,6 @@
 
 .member-list {
   overflow-y: auto;
-  /* padding: 10px; */
   margin-left: 50px;
 }
 
@@ -614,7 +598,6 @@
   max-width: 80%;
 }
 
-/* Scrollbar styling for all scrollable containers */
 .chat-list-item-container::-webkit-scrollbar,
 .member-list::-webkit-scrollbar,
 .messages-container::-webkit-scrollbar {
@@ -636,23 +619,23 @@
   }
 }
 
-/* Mobile user list toggle and overlay */
 .mobile-userlist-toggle {
-  display: none; /* Hide by default */
+  display: none;
   position: fixed;
-  top: 18px;
-  left: 18px;
-  z-index: 1200;
-  background: #2563eb;
-  color: #fff;
+  top: 20px;
+  left: 20px;
+  z-index: 2001;
+  background-color: #2563eb;
+  color: white;
   border: none;
   border-radius: 50%;
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   transition: background 0.2s;
 }
 .mobile-userlist-toggle:active,
@@ -662,42 +645,42 @@
 }
 
 .user-list-overlay {
-  display: none; /* Hidden by default */
+  display: none;
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(15, 23, 42, 0.96);
-  z-index: 1100;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
   overflow-y: auto;
-  animation: fadeIn 0.3s ease-out; /* Ensure animation is defined or used with opacity transition */
-  /* For smoother transitions, consider using opacity and visibility: */
-  /* opacity: 0; */
-  /* visibility: hidden; */
-  /* transition: opacity 0.3s ease, visibility 0.3s ease; */
+  animation: fadeIn 0.3s ease-out;
 }
+
 .user-list-overlay.open {
   display: block;
-  /* opacity: 1; */
-  /* visibility: visible; */
 }
+
 .user-list-content {
-  width: 100vw;
-  max-width: 100vw;
-  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  max-width: 300px;
+  height: 100%;
+  background-color: #1e293b;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
+  padding-top: 10px;
 }
 
 @media (max-width: 600px) {
   .mobile-userlist-toggle {
     display: flex;
   }
-  /* .user-list-overlay is handled by its base style and .open class */
-  /* .user-list-overlay.open is handled by its base style */
 
   .chat-header {
-    padding-left: 84px; /* Adjusted to make space for the toggle button */
+    padding-left: 84px;
   }
 }
 @media (min-width: 601px) {
@@ -707,7 +690,6 @@
   }
 }
 
-/* Responsive adjustments */
 @media (max-width: 900px) {
   .chat-list-column,
   .info-column {
@@ -722,12 +704,32 @@
   .layout {
     flex-direction: column;
   }
-  .chat-list-column,
+  .chat-list-column {
+    min-width: unset;
+    width: 100%;
+    padding-top: 0;
+  }
   .info-column {
     display: none;
   }
   .chat-area-column {
     width: 100%;
+    border-left: none;
+    border-right: none;
   }
-  /* The .chat-header rule is now above, consolidated with other mobile toggle styles */
+
+  .chat-header {
+    padding-left: 84px;
+    padding-right: 15px;
+  }
+
+  .messages-container {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .message-input-container {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
 }
