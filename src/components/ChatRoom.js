@@ -2,13 +2,9 @@ import React, { useEffect, useState } from "react";
 import { over } from "stompjs";
 import SockJS from "sockjs-client";
 import "./ChatRoom.css";
-import { motion } from "framer-motion";
 import {
-  FaSearch,
-  FaPlus,
   FaChevronDown,
   FaChevronUp,
-  FaUserCircle,
   FaPaperclip,
   FaTelegramPlane,
   FaUsers,
@@ -16,22 +12,21 @@ import {
   FaPhoneAlt,
   FaCog,
   FaBell,
-  FaSignOutAlt,
   FaPlusSquare,
-  FaEllipsisV,
-  FaRegSmile,
-  FaArrowLeft,
 } from "react-icons/fa";
 import { MdMoreVert, MdOutlineAttachFile, MdSend } from "react-icons/md";
 import FileUpload from "./FileUpload";
 import MobileUserListToggle from "./MobileUserListToggle";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ChatRoom = ({ user }) => {
   const [privateChats, setPrivateChats] = useState(new Map());
   const [publicChats, setPublicChats] = useState([]);
   const [tab, setTab] = useState("CHATROOM");
+  // Add userId to userData if available
   const [userData, setUserData] = useState({
     username: user?.username || "",
+    userId: user?.userId || null,
     receivername: "",
     connected: false,
     message: "",
@@ -41,17 +36,28 @@ const ChatRoom = ({ user }) => {
   const [publicSubscription, setPublicSubscription] = useState(null);
   const [privateSubscription, setPrivateSubscription] = useState(null);
   const [isUserListOpen, setIsUserListOpen] = useState(false);
+  const [filesData] = useState({
+    photos: 115,
+    files: 208,
+    sharedLinks: 47,
+  });
+  const [isPhotosExpanded, setIsPhotosExpanded] = useState(true);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (user?.username) {
       setUserData((prev) => ({
         ...prev,
         username: user.username,
+        userId: user.userId || null,
       }));
     } else {
       setUserData((prev) => ({
         ...prev,
         username: "",
+        userId: null,
         connected: false,
       }));
     }
@@ -138,8 +144,11 @@ const ChatRoom = ({ user }) => {
 
   const onMessageReceived = (payload) => {
     var payloadData = JSON.parse(payload.body);
+    const rawMessageBody = payload.body; // Store raw body for deduplication
+
     switch (payloadData.status) {
       case "JOIN":
+        // Update privateChats if sender is new
         if (!privateChats.get(payloadData.senderName)) {
           setPrivateChats((prev) => {
             const newMap = new Map(prev);
@@ -147,11 +156,45 @@ const ChatRoom = ({ user }) => {
             return newMap;
           });
         }
+        // Update onlineUsers if sender is new to the list
         setOnlineUsers((prev) => {
           if (!prev.includes(payloadData.senderName)) {
             return [...prev, payloadData.senderName];
           }
           return prev;
+        });
+
+        // Add JOIN message to public chats with deduplication
+        setPublicChats((prevPublicChats) => {
+          const alreadyExists = prevPublicChats.some(
+            (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
+          );
+          if (alreadyExists) {
+            return prevPublicChats;
+          }
+          return [
+            ...prevPublicChats,
+            { ...payloadData, type: "STATUS", rawBody: rawMessageBody },
+          ];
+        });
+        break;
+      case "LEAVE": // Handle LEAVE status
+        setOnlineUsers((prev) =>
+          prev.filter((user) => user !== payloadData.senderName)
+        );
+
+        // Add LEAVE message to public chats with deduplication
+        setPublicChats((prevPublicChats) => {
+          const alreadyExists = prevPublicChats.some(
+            (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
+          );
+          if (alreadyExists) {
+            return prevPublicChats;
+          }
+          return [
+            ...prevPublicChats,
+            { ...payloadData, type: "STATUS", rawBody: rawMessageBody },
+          ];
         });
         break;
       case "MESSAGE":
@@ -159,9 +202,12 @@ const ChatRoom = ({ user }) => {
           const messageExists = prevPublicChats.some(
             (chat) =>
               chat.message === payloadData.message &&
-              chat.senderName === payloadData.senderName
+              chat.senderName === payloadData.senderName &&
+              chat.status === "MESSAGE" // Ensure comparing against other messages
           );
           if (!messageExists) {
+            // Note: MESSAGE payloads might not need/have rawBody for this specific deduplication logic
+            // Or if they do, ensure it's added: { ...payloadData, rawBody: rawMessageBody }
             return [...prevPublicChats, payloadData];
           }
           return prevPublicChats;
@@ -243,8 +289,6 @@ const ChatRoom = ({ user }) => {
     });
   };
 
-  const onError = (err) => {};
-
   const handleMessage = (event) => {
     const { value } = event.target;
     setUserData((prev) => ({ ...prev, message: value }));
@@ -286,16 +330,6 @@ const ChatRoom = ({ user }) => {
     }
   };
 
-  const handleUsername = (event) => {
-    const { value } = event.target;
-    setUserData({ ...userData, username: value });
-  };
-
-  const registerUser = () => {
-    if (userData.username && !stompClient) {
-    }
-  };
-
   const getAvatarUrl = (username) => {
     if (!username) {
       return `https://ui-avatars.com/api/?name=?&background=cccccc&color=fff&size=48`;
@@ -319,15 +353,6 @@ const ChatRoom = ({ user }) => {
       firstLetter
     )}&background=${bgColor}&color=fff&size=48&font-size=0.5&bold=true`;
   };
-
-  const [filesData, setFilesData] = useState({
-    photos: 115,
-    files: 208,
-    sharedLinks: 47,
-  });
-  const [isPhotosExpanded, setIsPhotosExpanded] = useState(true);
-  const [isFilesExpanded, setIsFilesExpanded] = useState(true);
-  const [isLinksExpanded, setIsLinksExpanded] = useState(true);
 
   // Close overlay on outside click (mobile)
   useEffect(() => {
@@ -382,7 +407,7 @@ const ChatRoom = ({ user }) => {
                       ? `${publicChats[publicChats.length - 1].senderName}: ${
                           publicChats[publicChats.length - 1].message
                         }`
-                      : "Let's discuss this tom..."}
+                      : "Start messaging..."}
                   </p>
                 </div>
               </div>
@@ -451,7 +476,7 @@ const ChatRoom = ({ user }) => {
                   ? `${publicChats[publicChats.length - 1].senderName}: ${
                       publicChats[publicChats.length - 1].message
                     }`
-                  : "Let's discuss this tom..."}
+                  : "Start messaging..."}
               </p>
             </div>
           </div>
@@ -504,20 +529,53 @@ const ChatRoom = ({ user }) => {
             <MdMoreVert />
           </div>
         </div>
-        <div className="messages-container">
-          {(tab === "CHATROOM" ? publicChats : privateChats.get(tab) || []).map(
-            (chat, index) => (
+        <div
+          className="messages-container"
+          style={{ position: "relative", minHeight: 300 }}
+        >
+          <AnimatePresence initial={false}>
+            {(tab === "CHATROOM"
+              ? publicChats
+              : privateChats.get(tab) || []
+            ).map((chat, index) => (
               <React.Fragment key={index}>
-                {chat.status === "JOIN" && (
-                  <div className="system-message">
-                    <FaUsers /> {chat.senderName} joined the chat.
-                  </div>
+                {chat.type === "STATUS" && chat.status === "JOIN" && (
+                  <motion.div
+                    className="chat-status-update join"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {chat.senderName} joined the chat.
+                  </motion.div>
+                )}
+                {chat.type === "STATUS" && chat.status === "LEAVE" && (
+                  <motion.div
+                    className="chat-status-update leave"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {chat.senderName} left the chat.
+                  </motion.div>
                 )}
                 {chat.status === "MESSAGE" && (
-                  <div
+                  <motion.div
                     className={`message-bubble ${
                       chat.senderName === userData.username ? "self" : ""
                     }`}
+                    initial={{
+                      opacity: 0,
+                      x: chat.senderName === userData.username ? 60 : -60,
+                    }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{
+                      opacity: 0,
+                      x: chat.senderName === userData.username ? 60 : -60,
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
                     {chat.senderName !== userData.username && (
                       <img
@@ -531,9 +589,79 @@ const ChatRoom = ({ user }) => {
                       className="message-content"
                       style={{
                         order: chat.senderName === userData.username ? 1 : 2,
+                        background:
+                          chat.senderName === userData.username
+                            ? "#2563eb"
+                            : "#1e293b",
+                        color:
+                          chat.senderName === userData.username
+                            ? "#fff"
+                            : "#f1f5f9",
+                        boxShadow:
+                          chat.senderName === userData.username
+                            ? "0 2px 12px #2563eb33"
+                            : "0 2px 8px rgba(0,0,0,0.04)",
+                        borderRadius: 18,
+                        padding: "14px 18px",
+                        minWidth: 60,
+                        maxWidth: 420,
+                        position: "relative",
                       }}
                     >
-                      <p>{chat.message}</p>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: 13,
+                          marginBottom: 2,
+                          color:
+                            chat.senderName === userData.username
+                              ? "#c7d2fe"
+                              : "#60a5fa",
+                        }}
+                      >
+                        {chat.senderName !== userData.username
+                          ? chat.senderName
+                          : "You"}
+                      </div>
+                      <p style={{ margin: 0 }}>{chat.message}</p>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginTop: 6,
+                          fontSize: 11,
+                          color: "#a3a3a3",
+                        }}
+                      >
+                        <span>
+                          {chat.timestamp
+                            ? new Date(chat.timestamp).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </span>
+                        {chat.senderName === userData.username && (
+                          <>
+                            {chat.seen ? (
+                              <span
+                                style={{ color: "#22d3ee", fontWeight: 700 }}
+                              >
+                                Seen
+                              </span>
+                            ) : chat.delivered ? (
+                              <span
+                                style={{ color: "#60a5fa", fontWeight: 700 }}
+                              >
+                                Delivered
+                              </span>
+                            ) : (
+                              <span style={{ color: "#a3a3a3" }}>Sent</span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                     {chat.senderName === userData.username && (
                       <img
@@ -543,68 +671,33 @@ const ChatRoom = ({ user }) => {
                         style={{ order: 2 }}
                       />
                     )}
-                  </div>
+                  </motion.div>
                 )}
               </React.Fragment>
-            )
-          )}
+            ))}
+          </AnimatePresence>
         </div>
-        <FileUpload
-          uploaderId={userData.username}
-          onUploadSuccess={(data) => {
-            // Show a toast or message in chat when a file is uploaded
-            // For now, append a system message to the current chat
-            const fileUrl =
-              data?.fileUrl || data?.url || data?.downloadUrl || null;
-            const fileName =
-              data?.fileName || data?.originalName || data?.name || "File";
-            let message;
-            if (fileUrl) {
-              // If it's an image, show a preview, otherwise show a link
-              const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileUrl);
-              if (isImage) {
-                message = `🖼️ <a href='${fileUrl}' target='_blank' rel='noopener noreferrer'>${fileName}</a><br/><img src='${fileUrl}' alt='${fileName}' style='max-width:200px;max-height:150px;margin-top:4px;border-radius:8px;' />`;
-              } else {
-                message = `📎 <a href='${fileUrl}' target='_blank' rel='noopener noreferrer'>${fileName}</a> uploaded.`;
-              }
-            } else {
-              message = "A file was uploaded.";
-            }
-
-            if (tab === "CHATROOM") {
-              setPublicChats((prev) => [
-                ...prev,
-                {
-                  senderName: userData.username,
-                  message,
-                  status: "MESSAGE",
-                  timestamp: new Date().toISOString(),
-                  isSystem: true,
-                  isFile: true,
-                },
-              ]);
-            } else {
-              setPrivateChats((prevMap) => {
-                const newMap = new Map(prevMap);
-                const messages = newMap.get(tab) || [];
-                newMap.set(tab, [
-                  ...messages,
-                  {
-                    senderName: userData.username,
-                    message,
-                    status: "MESSAGE",
-                    timestamp: new Date().toISOString(),
-                    isSystem: true,
-                    isFile: true,
-                  },
-                ]);
-                return newMap;
-              });
-            }
-          }}
-        />
         <div className="message-input-container">
-          <button className="input-icon-button">
+          <input
+            type="file"
+            id="file-upload-input"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                setSelectedFile(e.target.files[0]);
+                setShowUpload(true);
+              }
+            }}
+            accept="image/*,video/*,audio/*,application/pdf"
+          />
+          <button
+            className="input-icon-button"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById("file-upload-input").click();
+            }}
+            title="Attach file"
+          >
             <MdOutlineAttachFile />
           </button>
           <input
@@ -626,6 +719,133 @@ const ChatRoom = ({ user }) => {
             <MdSend />
           </button>
         </div>
+        {/* File upload modal/inline UI */}
+        {showUpload && selectedFile && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: "absolute",
+              bottom: 80,
+              left: 0,
+              right: 0,
+              margin: "auto",
+              width: 320,
+              background: "#1e293b",
+              borderRadius: 12,
+              boxShadow: "0 4px 24px #0002",
+              padding: 24,
+              zIndex: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ marginBottom: 12, color: "#fff", fontWeight: 600 }}>
+              {selectedFile.name}
+            </div>
+            <button
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 24px",
+                fontWeight: 600,
+                cursor: "pointer",
+                marginBottom: 8,
+              }}
+              onClick={async () => {
+                setUploading(true);
+                const formData = new FormData();
+                formData.append("file", selectedFile);
+                formData.append("uploaderId", userData.userId);
+                try {
+                  const response = await fetch(
+                    "http://localhost:8080/api/files/upload",
+                    {
+                      method: "POST",
+                      body: formData,
+                    }
+                  );
+                  const data = await response.json();
+                  if (tab === "CHATROOM") {
+                    setPublicChats((prev) => [
+                      ...prev,
+                      {
+                        senderName: userData.username,
+                        message: `📎 <a href='${
+                          data.fileUrl
+                        }' target='_blank' rel='noopener noreferrer'>${
+                          data.fileName ||
+                          data.originalName ||
+                          data.name ||
+                          "File"
+                        }</a> uploaded.`,
+                        status: "MESSAGE",
+                        timestamp: new Date().toISOString(),
+                        isSystem: true,
+                        isFile: true,
+                      },
+                    ]);
+                  } else {
+                    setPrivateChats((prevMap) => {
+                      const newMap = new Map(prevMap);
+                      const messages = newMap.get(tab) || [];
+                      newMap.set(tab, [
+                        ...messages,
+                        {
+                          senderName: userData.username,
+                          message: `📎 <a href='${
+                            data.fileUrl
+                          }' target='_blank' rel='noopener noreferrer'>${
+                            data.fileName ||
+                            data.originalName ||
+                            data.name ||
+                            "File"
+                          }</a> uploaded.`,
+                          status: "MESSAGE",
+                          timestamp: new Date().toISOString(),
+                          isSystem: true,
+                          isFile: true,
+                        },
+                      ]);
+                      return newMap;
+                    });
+                  }
+                  setShowUpload(false);
+                  setSelectedFile(null);
+                } catch (err) {
+                  alert("Upload failed.");
+                } finally {
+                  setUploading(false);
+                }
+              }}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading..." : "Upload"}
+            </button>
+            <button
+              style={{
+                background: "none",
+                color: "#f87171",
+                border: "none",
+                borderRadius: 8,
+                padding: "4px 12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                setShowUpload(false);
+                setSelectedFile(null);
+              }}
+            >
+              Cancel
+            </button>
+          </motion.div>
+        )}
       </div>
       <div className="info-column">
         <div className="info-header">
