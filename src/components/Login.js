@@ -125,11 +125,25 @@ const Link = styled.span`
 export default function Login({ onLogin, onSwitch }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
-  const handleSubmit = (e) => {
+  const [error, setError] = useState("");
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // For demo, just pass username
-    onLogin({ username });
+    setError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onLogin(data.user);
+      } else {
+        setError(data.message || "Login failed");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    }
   };
 
   return (
@@ -156,6 +170,9 @@ export default function Login({ onLogin, onSwitch }) {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            {error && (
+              <div style={{ color: "#f87171", marginBottom: 8 }}>{error}</div>
+            )}
             <Button type="submit">Login</Button>
           </Form>
           <SwitchText>

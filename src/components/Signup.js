@@ -126,12 +126,31 @@ export default function Signup({ onSignup, onSwitch }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirm) return;
-    // For demo, just pass username
-    onSignup({ username });
+    setError("");
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, displayName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onSignup(data.user);
+      } else {
+        setError(data.message || "Registration failed");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    }
   };
 
   return (
@@ -165,6 +184,15 @@ export default function Signup({ onSignup, onSwitch }) {
               onChange={(e) => setConfirm(e.target.value)}
               required
             />
+            <Input
+              type="text"
+              placeholder="Display Name (optional)"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+            {error && (
+              <div style={{ color: "#f87171", marginBottom: 8 }}>{error}</div>
+            )}
             <Button type="submit">Sign Up</Button>
           </Form>
           <SwitchText>
