@@ -1,5 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap");
-
 body {
   margin: 0;
   font-family: "Jost", sans-serif;
@@ -14,27 +13,6 @@ code {
 input,
 button {
   font-family: inherit;
-}
-
-/* Remove legacy styles for old chat layout */
-.container,
-.register,
-.chat-box,
-.member-list,
-.chat-content,
-.chat-messages,
-.send-message,
-.input-message,
-.send-button,
-.member,
-.member.active,
-.member:hover,
-.avatar,
-.avatar.self,
-.message,
-.message-data,
-.message.self {
-  all: unset;
 }
 
 /* Modernize scrollbars */
