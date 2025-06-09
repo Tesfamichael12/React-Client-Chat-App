@@ -14,7 +14,7 @@ const FileUpload = ({ uploaderId, onUploadSuccess }) => {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("uploaderId", uploaderId);
+    formData.append("uploaderId", Number(uploaderId));
 
     try {
       const response = await fetch("http://localhost:8080/api/files/upload", {

@@ -1,4 +1,5 @@
 import React from "react";
+import { FaUsers } from "react-icons/fa";
 
 export default function MobileUserListToggle({ onClick, isOpen }) {
   return (
@@ -7,10 +8,7 @@ export default function MobileUserListToggle({ onClick, isOpen }) {
       aria-label="Show user list"
       onClick={onClick}
     >
-      {/* Hamburger icon */}
-      <span className="bar" />
-      <span className="bar" />
-      <span className="bar" />
+      <FaUsers style={{ fontSize: "1.7rem" }} />
     </button>
   );
 }

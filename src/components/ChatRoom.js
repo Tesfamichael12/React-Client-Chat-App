@@ -18,12 +18,12 @@ import { MdMoreVert, MdOutlineAttachFile, MdSend } from "react-icons/md";
 import FileUpload from "./FileUpload";
 import MobileUserListToggle from "./MobileUserListToggle";
 import { motion, AnimatePresence } from "framer-motion";
+import { FaCheck, FaCheckDouble } from "react-icons/fa";
 
 const ChatRoom = ({ user }) => {
   const [privateChats, setPrivateChats] = useState(new Map());
   const [publicChats, setPublicChats] = useState([]);
   const [tab, setTab] = useState("CHATROOM");
-  // Add userId to userData if available
   const [userData, setUserData] = useState({
     username: user?.username || "",
     userId: user?.userId || null,
@@ -45,6 +45,7 @@ const ChatRoom = ({ user }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
 
   useEffect(() => {
     if (user?.username) {
@@ -62,6 +63,14 @@ const ChatRoom = ({ user }) => {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 600);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (!userData.username) {
@@ -144,11 +153,10 @@ const ChatRoom = ({ user }) => {
 
   const onMessageReceived = (payload) => {
     var payloadData = JSON.parse(payload.body);
-    const rawMessageBody = payload.body; // Store raw body for deduplication
+    const rawMessageBody = payload.body;
 
     switch (payloadData.status) {
       case "JOIN":
-        // Update privateChats if sender is new
         if (!privateChats.get(payloadData.senderName)) {
           setPrivateChats((prev) => {
             const newMap = new Map(prev);
@@ -156,7 +164,6 @@ const ChatRoom = ({ user }) => {
             return newMap;
           });
         }
-        // Update onlineUsers if sender is new to the list
         setOnlineUsers((prev) => {
           if (!prev.includes(payloadData.senderName)) {
             return [...prev, payloadData.senderName];
@@ -164,7 +171,6 @@ const ChatRoom = ({ user }) => {
           return prev;
         });
 
-        // Add JOIN message to public chats with deduplication
         setPublicChats((prevPublicChats) => {
           const alreadyExists = prevPublicChats.some(
             (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
@@ -178,12 +184,11 @@ const ChatRoom = ({ user }) => {
           ];
         });
         break;
-      case "LEAVE": // Handle LEAVE status
+      case "LEAVE":
         setOnlineUsers((prev) =>
           prev.filter((user) => user !== payloadData.senderName)
         );
 
-        // Add LEAVE message to public chats with deduplication
         setPublicChats((prevPublicChats) => {
           const alreadyExists = prevPublicChats.some(
             (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
@@ -203,11 +208,9 @@ const ChatRoom = ({ user }) => {
             (chat) =>
               chat.message === payloadData.message &&
               chat.senderName === payloadData.senderName &&
-              chat.status === "MESSAGE" // Ensure comparing against other messages
+              chat.status === "MESSAGE"
           );
           if (!messageExists) {
-            // Note: MESSAGE payloads might not need/have rawBody for this specific deduplication logic
-            // Or if they do, ensure it's added: { ...payloadData, rawBody: rawMessageBody }
             return [...prevPublicChats, payloadData];
           }
           return prevPublicChats;
@@ -354,7 +357,6 @@ const ChatRoom = ({ user }) => {
     )}&background=${bgColor}&color=fff&size=48&font-size=0.5&bold=true`;
   };
 
-  // Close overlay on outside click (mobile)
   useEffect(() => {
     if (!isUserListOpen) return;
     const handleClick = (e) => {
@@ -372,146 +374,168 @@ const ChatRoom = ({ user }) => {
 
   return (
     <div className="layout">
-      {/* User List Overlay for mobile */}
-      <div
-        className={`user-list-overlay${isUserListOpen ? " open" : ""}`}
-        style={{ display: isUserListOpen ? "block" : "none" }}
-      >
-        <div className="user-list-content">
-          {/* Render user list here (reuse left column content) */}
-          <div className="chat-list-column" style={{ marginTop: "70px" }}>
-            <div className="chat-list-header">
-              <h2>Ahun chat</h2>
-              <FaPlusSquare style={{ cursor: "pointer", fontSize: "1.2rem" }} />
-            </div>
-            <div className="chat-list-item-container">
+      {isMobile && (
+        <>
+          <MobileUserListToggle
+            onClick={() => setIsUserListOpen((v) => !v)}
+            isOpen={isUserListOpen}
+          />
+          <div
+            className={`user-list-overlay${isUserListOpen ? " open" : ""}`}
+            style={{ display: isUserListOpen ? "block" : "none", zIndex: 2000 }}
+          >
+            <div className="user-list-content">
               <div
-                className={`chat-list-item ${
-                  tab === "CHATROOM" ? "active" : ""
-                }`}
-                onClick={() => setTab("CHATROOM")}
+                className="chat-list-column"
+                style={{
+                  marginTop: "-10px",
+                  display: "block",
+                  width: "100vw",
+                  minWidth: 0,
+                  maxWidth: "100vw",
+                }}
               >
-                <img
-                  src={getAvatarUrl("Ahun chat")}
-                  alt="Ahun Chat"
-                  className="chat-list-item-avatar"
-                />
-                <div className="chat-list-item-content">
-                  <p className="chat-list-item-name">Ahun Chat</p>
-                  <p
-                    className={`chat-list-item-preview ${
+                <div className="chat-list-header">
+                  <h2>Ahun chat</h2>
+                  <FaPlusSquare
+                    style={{ cursor: "pointer", fontSize: "1.2rem" }}
+                  />
+                </div>
+                <div className="chat-list-item-container">
+                  <div
+                    className={`chat-list-item ${
                       tab === "CHATROOM" ? "active" : ""
                     }`}
+                    onClick={() => {
+                      setTab("CHATROOM");
+                      setIsUserListOpen(false);
+                    }}
                   >
-                    {publicChats.length > 0
-                      ? `${publicChats[publicChats.length - 1].senderName}: ${
-                          publicChats[publicChats.length - 1].message
-                        }`
-                      : "Start messaging..."}
-                  </p>
-                </div>
-              </div>
-              {[...privateChats.keys()].map((name, index) => (
-                <div
-                  key={index}
-                  className={`chat-list-item ${tab === name ? "active" : ""}`}
-                  onClick={() => setTab(name)}
-                >
-                  <img
-                    src={getAvatarUrl(name)}
-                    alt={name}
-                    className="chat-list-item-avatar"
-                  />
-                  <div className="chat-list-item-content">
-                    <p className="chat-list-item-name">{name}</p>
-                    <p
-                      className={`chat-list-item-preview ${
+                    <img
+                      src={getAvatarUrl("Ahun chat")}
+                      alt="Ahun Chat"
+                      className="chat-list-item-avatar"
+                    />
+                    <div className="chat-list-item-content">
+                      <p className="chat-list-item-name">Ahun Chat</p>
+                      <p
+                        className={`chat-list-item-preview ${
+                          tab === "CHATROOM" ? "active" : ""
+                        }`}
+                      >
+                        {publicChats.length > 0
+                          ? `${
+                              publicChats[publicChats.length - 1].senderName
+                            }: ${publicChats[publicChats.length - 1].message}`
+                          : "Start messaging..."}
+                      </p>
+                    </div>
+                  </div>
+                  {[...privateChats.keys()].map((name, index) => (
+                    <div
+                      key={index}
+                      className={`chat-list-item ${
                         tab === name ? "active" : ""
                       }`}
+                      onClick={() => {
+                        setTab(name);
+                        setIsUserListOpen(false);
+                      }}
                     >
-                      {privateChats.get(name) &&
-                      privateChats.get(name).length > 0
-                        ? `${privateChats
-                            .get(name)
-                            [
-                              privateChats.get(name).length - 1
-                            ].message.substring(0, 30)}...`
-                        : "No messages yet"}
-                    </p>
-                  </div>
+                      <img
+                        src={getAvatarUrl(name)}
+                        alt={name}
+                        className="chat-list-item-avatar"
+                      />
+                      <div className="chat-list-item-content">
+                        <p className="chat-list-item-name">{name}</p>
+                        <p
+                          className={`chat-list-item-preview ${
+                            tab === name ? "active" : ""
+                          }`}
+                        >
+                          {privateChats.get(name) &&
+                          privateChats.get(name).length > 0
+                            ? `${privateChats
+                                .get(name)
+                                [
+                                  privateChats.get(name).length - 1
+                                ].message.substring(0, 30)}...`
+                            : "No messages yet"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-      {/* Mobile toggle button in chat header */}
-      <MobileUserListToggle
-        onClick={() => setIsUserListOpen((v) => !v)}
-        isOpen={isUserListOpen}
-      />
-      <div className="chat-list-column" style={{ marginTop: "70px" }}>
-        <div className="chat-list-header">
-          <h2>Ahun chat</h2>
-          <FaPlusSquare style={{ cursor: "pointer", fontSize: "1.2rem" }} />
-        </div>
-        <div className="chat-list-item-container">
-          <div
-            className={`chat-list-item ${tab === "CHATROOM" ? "active" : ""}`}
-            onClick={() => setTab("CHATROOM")}
-          >
-            <img
-              src={getAvatarUrl("Ahun chat")}
-              alt="Ahun Chat"
-              className="chat-list-item-avatar"
-            />
-            <div className="chat-list-item-content">
-              <p className="chat-list-item-name">Ahun Chat</p>
-              <p
-                className={`chat-list-item-preview ${
-                  tab === "CHATROOM" ? "active" : ""
-                }`}
-              >
-                {publicChats.length > 0
-                  ? `${publicChats[publicChats.length - 1].senderName}: ${
-                      publicChats[publicChats.length - 1].message
-                    }`
-                  : "Start messaging..."}
-              </p>
-            </div>
+        </>
+      )}
+      {!isMobile && (
+        <div className="chat-list-column" style={{ marginTop: "-10px" }}>
+          <div className="chat-list-header">
+            <h2>Ahun chat</h2>
+            <FaPlusSquare style={{ cursor: "pointer", fontSize: "1.2rem" }} />
           </div>
-          {[...privateChats.keys()].map((name, index) => (
+          <div className="chat-list-item-container">
             <div
-              key={index}
-              className={`chat-list-item ${tab === name ? "active" : ""}`}
-              onClick={() => setTab(name)}
+              className={`chat-list-item ${tab === "CHATROOM" ? "active" : ""}`}
+              onClick={() => setTab("CHATROOM")}
             >
               <img
-                src={getAvatarUrl(name)}
-                alt={name}
+                src={getAvatarUrl("Ahun chat")}
+                alt="Ahun Chat"
                 className="chat-list-item-avatar"
               />
               <div className="chat-list-item-content">
-                <p className="chat-list-item-name">{name}</p>
+                <p className="chat-list-item-name">Ahun Chat</p>
                 <p
                   className={`chat-list-item-preview ${
-                    tab === name ? "active" : ""
+                    tab === "CHATROOM" ? "active" : ""
                   }`}
                 >
-                  {privateChats.get(name) && privateChats.get(name).length > 0
-                    ? `${privateChats
-                        .get(name)
-                        [privateChats.get(name).length - 1].message.substring(
-                          0,
-                          30
-                        )}...`
-                    : "No messages yet"}
+                  {publicChats.length > 0
+                    ? `${publicChats[publicChats.length - 1].senderName}: ${
+                        publicChats[publicChats.length - 1].message
+                      }`
+                    : "Start messaging..."}
                 </p>
               </div>
             </div>
-          ))}
+            {[...privateChats.keys()].map((name, index) => (
+              <div
+                key={index}
+                className={`chat-list-item ${tab === name ? "active" : ""}`}
+                onClick={() => setTab(name)}
+              >
+                <img
+                  src={getAvatarUrl(name)}
+                  alt={name}
+                  className="chat-list-item-avatar"
+                />
+                <div className="chat-list-item-content">
+                  <p className="chat-list-item-name">{name}</p>
+                  <p
+                    className={`chat-list-item-preview ${
+                      tab === name ? "active" : ""
+                    }`}
+                  >
+                    {privateChats.get(name) && privateChats.get(name).length > 0
+                      ? `${privateChats
+                          .get(name)
+                          [privateChats.get(name).length - 1].message.substring(
+                            0,
+                            30
+                          )}...`
+                      : "No messages yet"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div className="chat-area-column">
         <div className="chat-header">
           <div className="chat-header-info">
@@ -582,59 +606,17 @@ const ChatRoom = ({ user }) => {
                         src={getAvatarUrl(chat.senderName)}
                         alt={chat.senderName}
                         className="message-avatar"
-                        style={{ order: 1 }}
                       />
                     )}
-                    <div
-                      className="message-content"
-                      style={{
-                        order: chat.senderName === userData.username ? 1 : 2,
-                        background:
-                          chat.senderName === userData.username
-                            ? "#2563eb"
-                            : "#1e293b",
-                        color:
-                          chat.senderName === userData.username
-                            ? "#fff"
-                            : "#f1f5f9",
-                        boxShadow:
-                          chat.senderName === userData.username
-                            ? "0 2px 12px #2563eb33"
-                            : "0 2px 8px rgba(0,0,0,0.04)",
-                        borderRadius: 18,
-                        padding: "14px 18px",
-                        minWidth: 60,
-                        maxWidth: 420,
-                        position: "relative",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: 13,
-                          marginBottom: 2,
-                          color:
-                            chat.senderName === userData.username
-                              ? "#c7d2fe"
-                              : "#60a5fa",
-                        }}
-                      >
+                    <div className="message-content">
+                      <div className="message-sender-name">
                         {chat.senderName !== userData.username
                           ? chat.senderName
                           : "You"}
                       </div>
-                      <p style={{ margin: 0 }}>{chat.message}</p>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginTop: 6,
-                          fontSize: 11,
-                          color: "#a3a3a3",
-                        }}
-                      >
-                        <span>
+                      <p className="message-text">{chat.message}</p>
+                      <div className="message-metadata">
+                        <span className="message-timestamp">
                           {chat.timestamp
                             ? new Date(chat.timestamp).toLocaleTimeString([], {
                                 hour: "2-digit",
@@ -643,23 +625,15 @@ const ChatRoom = ({ user }) => {
                             : ""}
                         </span>
                         {chat.senderName === userData.username && (
-                          <>
-                            {chat.seen ? (
-                              <span
-                                style={{ color: "#22d3ee", fontWeight: 700 }}
-                              >
-                                Seen
-                              </span>
-                            ) : chat.delivered ? (
-                              <span
-                                style={{ color: "#60a5fa", fontWeight: 700 }}
-                              >
-                                Delivered
-                              </span>
+                          <span className="message-status-text">
+                            {chat.statusValue === "SEEN" ? (
+                              <FaCheckDouble className="message-status-icon seen" />
+                            ) : chat.statusValue === "DELIVERED" ? (
+                              <FaCheckDouble className="message-status-icon delivered" />
                             ) : (
-                              <span style={{ color: "#a3a3a3" }}>Sent</span>
+                              <FaCheck className="message-status-icon sent" />
                             )}
-                          </>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -668,7 +642,6 @@ const ChatRoom = ({ user }) => {
                         src={getAvatarUrl(chat.senderName)}
                         alt={chat.senderName}
                         className="message-avatar"
-                        style={{ order: 2 }}
                       />
                     )}
                   </motion.div>
@@ -719,7 +692,6 @@ const ChatRoom = ({ user }) => {
             <MdSend />
           </button>
         </div>
-        {/* File upload modal/inline UI */}
         {showUpload && selectedFile && (
           <motion.div
             initial={{ opacity: 0, y: 30 }}

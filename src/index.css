@@ -15,7 +15,7 @@ button {
   font-family: inherit;
 }
 
-/* Modernize scrollbars */
+/* scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
   background: #e0e7ef;
@@ -25,7 +25,7 @@ button {
   border-radius: 8px;
 }
 
-/* Utility classes for spacing if needed */
+/* Utility classes for spacing */
 .mt-2 {
   margin-top: 2rem;
 }

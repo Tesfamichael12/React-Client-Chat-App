@@ -90,7 +90,7 @@ const Input = styled.input`
   }
 `;
 const Button = styled.button`
-  background: ${({ theme }) => theme.primary};
+  background: #01155e;
   color: #fff;
   border: none;
   border-radius: 0.75rem;
@@ -101,8 +101,9 @@ const Button = styled.button`
   margin-top: 0.5rem;
   transition: background 0.2s;
   box-shadow: 0 1px 8px rgba(30, 41, 59, 0.1);
+  width: 100%;
   &:hover {
-    background: ${({ theme }) => theme.secondary};
+    background: #0369a1;
   }
 `;
 const SwitchText = styled.p`
