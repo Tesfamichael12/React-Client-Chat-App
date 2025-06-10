@@ -1,6 +1,6 @@
-# 🚀 Ahun Chat Application
+# 🚀 Afro Chat Application
 
-Welcome to **Ahun Chat** – a modern, real-time chat application built with React and WebSockets! 💬✨
+Welcome to **Afro Chat** – a modern, real-time chat application built with React and WebSockets! 💬✨
 
 ---
 

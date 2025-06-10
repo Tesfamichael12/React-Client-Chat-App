@@ -250,42 +250,17 @@ const ChatRoom = ({ user }) => {
       }
       let messages = newMap.get(chatKey) || [];
       const serverMessage = { ...payloadData, isOptimistic: false };
-      if (isEcho && payloadData.clientTempId) {
-        const optimisticMessageIndex = messages.findIndex(
-          (msg) =>
-            msg.isOptimistic && msg.clientTempId === payloadData.clientTempId
-        );
-        if (optimisticMessageIndex !== -1) {
-          messages = [
-            ...messages.slice(0, optimisticMessageIndex),
-            serverMessage,
-            ...messages.slice(optimisticMessageIndex + 1),
-          ];
-        } else {
-          const alreadyExists = messages.some(
-            (msg) =>
-              !msg.isOptimistic &&
-              msg.senderName === serverMessage.senderName &&
-              msg.receiverName === serverMessage.receiverName &&
-              msg.message === serverMessage.message &&
-              msg.timestamp === serverMessage.timestamp
-          );
-          if (!alreadyExists) {
-            messages = [...messages, serverMessage];
-          }
-        }
-      } else {
-        const alreadyExists = messages.some(
-          (msg) =>
-            !msg.isOptimistic &&
-            msg.senderName === serverMessage.senderName &&
-            (isEcho ? msg.receiverName === serverMessage.receiverName : true) &&
-            msg.message === serverMessage.message &&
-            msg.timestamp === serverMessage.timestamp
-        );
-        if (!alreadyExists) {
-          messages = [...messages, serverMessage];
-        }
+      // Prevent duplicates for the other end user
+      const alreadyExists = messages.some(
+        (msg) =>
+          msg.senderName === serverMessage.senderName &&
+          msg.receiverName === serverMessage.receiverName &&
+          msg.message === serverMessage.message &&
+          (msg.date || msg.timestamp) ===
+            (serverMessage.date || serverMessage.timestamp)
+      );
+      if (!alreadyExists) {
+        messages = [...messages, serverMessage];
       }
       newMap.set(chatKey, messages);
       return newMap;
@@ -391,25 +366,59 @@ const ChatRoom = ({ user }) => {
       fetch("/api/messages/group?roomId=1")
         .then((res) => res.json())
         .then((messages) => {
-          setPublicChats(messages);
+          // Map messages to include senderName, message, date, and receiverName
+          setPublicChats(
+            Array.isArray(messages)
+              ? messages.map((msg) => ({
+                  senderName: msg.senderName,
+                  message: msg.message,
+                  date: msg.date || msg.timestamp,
+                  receiverName: msg.receiverName,
+                  status: msg.status || "MESSAGE",
+                }))
+              : []
+          );
         });
     }
   }, [userData.username, userData.connected]);
 
   // Only fetch private messages from backend on login or tab switch (when WebSocket is not yet connected)
   useEffect(() => {
-    if (userData.username && !userData.connected && tab !== "CHATROOM") {
+    if (userData.username && tab !== "CHATROOM") {
       fetch(`/api/messages/private?user1=${userData.username}&user2=${tab}`)
         .then((res) => res.json())
         .then((messages) => {
           setPrivateChats((prev) => {
             const newMap = new Map(prev);
-            newMap.set(tab, Array.isArray(messages) ? messages : []);
+            // Avoid duplicate messages: filter out any already present (by date+sender+message)
+            const existing = newMap.get(tab) || [];
+            const existingKeys = new Set(
+              existing.map(
+                (m) => (m.date || m.timestamp || "") + m.senderName + m.message
+              )
+            );
+            const newMessages = (
+              Array.isArray(messages) ? messages : []
+            ).filter((m) => {
+              const key =
+                (m.date || m.timestamp || "") + m.senderName + m.message;
+              return !existingKeys.has(key);
+            });
+            newMap.set(tab, [
+              ...existing,
+              ...newMessages.map((msg) => ({
+                senderName: msg.senderName,
+                message: msg.message,
+                date: msg.date || msg.timestamp,
+                receiverName: msg.receiverName,
+                status: msg.status || "MESSAGE",
+              })),
+            ]);
             return newMap;
           });
         });
     }
-  }, [userData.username, tab, userData.connected]);
+  }, [userData.username, tab]);
 
   return (
     <div className="layout">
@@ -433,7 +442,7 @@ const ChatRoom = ({ user }) => {
                 }}
               >
                 <div className="chat-list-header">
-                  <h2>Ahun chat</h2>
+                  <h2>Afro Chat</h2>
                   <FaPlusSquare
                     style={{ cursor: "pointer", fontSize: "1.2rem" }}
                   />
@@ -449,12 +458,12 @@ const ChatRoom = ({ user }) => {
                     }}
                   >
                     <img
-                      src={getAvatarUrl("Ahun chat")}
-                      alt="Ahun Chat"
+                      src={getAvatarUrl("Afro Chat")}
+                      alt="Afro Chat"
                       className="chat-list-item-avatar"
                     />
                     <div className="chat-list-item-content">
-                      <p className="chat-list-item-name">Ahun Chat</p>
+                      <p className="chat-list-item-name">Afro Chat</p>
                       <p
                         className={`chat-list-item-preview ${
                           tab === "CHATROOM" ? "active" : ""
@@ -512,7 +521,7 @@ const ChatRoom = ({ user }) => {
       {!isMobile && (
         <div className="chat-list-column" style={{ marginTop: "-10px" }}>
           <div className="chat-list-header">
-            <h2>Ahun chat</h2>
+            <h2>Afro Chat</h2>
             <FaPlusSquare style={{ cursor: "pointer", fontSize: "1.2rem" }} />
           </div>
           <div className="chat-list-item-container">
@@ -521,12 +530,12 @@ const ChatRoom = ({ user }) => {
               onClick={() => setTab("CHATROOM")}
             >
               <img
-                src={getAvatarUrl("Ahun chat")}
-                alt="Ahun Chat"
+                src={getAvatarUrl("Afro Chat")}
+                alt="Afro Chat"
                 className="chat-list-item-avatar"
               />
               <div className="chat-list-item-content">
-                <p className="chat-list-item-name">Ahun Chat</p>
+                <p className="chat-list-item-name">Afro Chat</p>
                 <p
                   className={`chat-list-item-preview ${
                     tab === "CHATROOM" ? "active" : ""
@@ -577,12 +586,12 @@ const ChatRoom = ({ user }) => {
         <div className="chat-header">
           <div className="chat-header-info">
             <img
-              src={getAvatarUrl(tab === "CHATROOM" ? "Ahun chat" : tab)}
+              src={getAvatarUrl(tab === "CHATROOM" ? "Afro Chat" : tab)}
               alt={tab}
               className="chat-list-item-avatar"
               style={{ width: "40px", height: "40px" }}
             />
-            <h2>{tab === "CHATROOM" ? "Ahun Chat" : tab}</h2>
+            <h2>{tab === "CHATROOM" ? "Afro Chat" : tab}</h2>
           </div>
           <div className="chat-header-icons">
             <FaPhoneAlt
