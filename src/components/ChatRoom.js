@@ -15,7 +15,6 @@ import {
   FaPlusSquare,
 } from "react-icons/fa";
 import { MdMoreVert, MdOutlineAttachFile, MdSend } from "react-icons/md";
-// import FileUpload from "./FileUpload";
 import MobileUserListToggle from "./MobileUserListToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaCheck, FaCheckDouble } from "react-icons/fa";
@@ -173,14 +172,15 @@ const ChatRoom = ({ user }) => {
         });
 
         setPublicChats((prevPublicChats) => {
-          const alreadyExists = prevPublicChats.some(
+          const arr = Array.isArray(prevPublicChats) ? prevPublicChats : [];
+          const alreadyExists = arr.some(
             (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
           );
           if (alreadyExists) {
-            return prevPublicChats;
+            return arr;
           }
           return [
-            ...prevPublicChats,
+            ...arr,
             { ...payloadData, type: "STATUS", rawBody: rawMessageBody },
           ];
         });
@@ -191,30 +191,29 @@ const ChatRoom = ({ user }) => {
         );
 
         setPublicChats((prevPublicChats) => {
-          const alreadyExists = prevPublicChats.some(
+          const arr = Array.isArray(prevPublicChats) ? prevPublicChats : [];
+          const alreadyExists = arr.some(
             (chat) => chat.rawBody === rawMessageBody && chat.type === "STATUS"
           );
           if (alreadyExists) {
-            return prevPublicChats;
+            return arr;
           }
-          return [
-            ...prevPublicChats,
-            { ...payloadData, type: "STATUS", rawMessageBody },
-          ];
+          return [...arr, { ...payloadData, type: "STATUS", rawMessageBody }];
         });
         break;
       case "MESSAGE":
         setPublicChats((prevPublicChats) => {
-          const messageExists = prevPublicChats.some(
+          const arr = Array.isArray(prevPublicChats) ? prevPublicChats : [];
+          const messageExists = arr.some(
             (chat) =>
               chat.message === payloadData.message &&
               chat.senderName === payloadData.senderName &&
               chat.status === "MESSAGE"
           );
           if (!messageExists) {
-            return [...prevPublicChats, payloadData];
+            return [...arr, payloadData];
           }
-          return prevPublicChats;
+          return arr;
         });
         break;
       default:
@@ -362,7 +361,7 @@ const ChatRoom = ({ user }) => {
     if (!isUserListOpen) return;
     const handleClick = (e) => {
       if (
-        e.target.closest(".user-list-content") || // Changed from .user-list-overlay
+        e.target.closest(".user-list-content") ||
         e.target.closest(".mobile-userlist-toggle")
       ) {
         return;
@@ -372,6 +371,33 @@ const ChatRoom = ({ user }) => {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isUserListOpen]);
+
+  // Fetch previous public messages only once on login
+  useEffect(() => {
+    if (userData.username) {
+      fetch("/api/messages/group?roomId=1")
+        .then((res) => res.json())
+        .then((messages) => {
+          setPublicChats(Array.isArray(messages) ? messages : []);
+        });
+    }
+    // eslint-disable-next-line
+  }, [userData.username]);
+
+  useEffect(() => {
+    // Fetch previous private messages when switching to a private tab
+    if (userData.username && tab !== "CHATROOM") {
+      fetch(`/api/messages/private?user1=${userData.username}&user2=${tab}`)
+        .then((res) => res.json())
+        .then((messages) => {
+          setPrivateChats((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(tab, Array.isArray(messages) ? messages : []);
+            return newMap;
+          });
+        });
+    }
+  }, [userData.username, tab]);
 
   return (
     <div className="layout">
@@ -389,9 +415,9 @@ const ChatRoom = ({ user }) => {
               <div
                 className="chat-list-column"
                 style={{
-                  marginTop: "-10px",
-                  width: "100%", // Changed from 100vw
-                  height: "100%", // Added height
+                  marginTop: "10px",
+                  width: "100%",
+                  height: "100vh",
                 }}
               >
                 <div className="chat-list-header">
@@ -552,10 +578,7 @@ const ChatRoom = ({ user }) => {
             <MdMoreVert />
           </div>
         </div>
-        <div
-          className="messages-container"
-          style={{ position: "relative" }} // Removed minHeight: 300
-        >
+        <div className="messages-container" style={{ position: "relative" }}>
           <AnimatePresence initial={false}>
             {(tab === "CHATROOM"
               ? publicChats

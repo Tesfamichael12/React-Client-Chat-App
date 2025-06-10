@@ -151,10 +151,11 @@
   color: #f1f5f9;
   font-weight: 700;
   letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: calc(100% - 100px);
+  /* On large screens, show full username, no truncation */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: none;
 }
 
 .chat-header-icons {
