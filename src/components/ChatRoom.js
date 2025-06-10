@@ -298,37 +298,50 @@ const ChatRoom = ({ user }) => {
   };
   const sendValue = () => {
     if (stompClient && userData.message.trim() && userData.connected) {
+      const now = new Date();
+      const clientTempId = `${
+        userData.username
+      }-${now.getTime()}-${Math.random()}`;
       var chatMessage = {
         senderName: userData.username,
+        receiverName: "public",
         message: userData.message,
+        date: now.toISOString(),
         status: "MESSAGE",
+        clientTempId,
       };
-      stompClient.send("/chatroom/public", {}, JSON.stringify(chatMessage));
+      // Optimistically add to publicChats
+      setPublicChats((prev) => [
+        ...prev,
+        { ...chatMessage, isOptimistic: true },
+      ]);
+      stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
       setUserData((prev) => ({ ...prev, message: "" }));
     }
   };
 
   const sendPrivateValue = () => {
     if (stompClient && userData.message.trim() && userData.connected) {
-      const clientTimestamp = new Date().toISOString();
-      const clientTempId = `client-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+      const now = new Date();
+      const clientTempId = `${
+        userData.username
+      }-${now.getTime()}-${Math.random()}`;
       const chatMessage = {
         senderName: userData.username,
         receiverName: tab,
         message: userData.message,
+        date: now.toISOString(),
         status: "MESSAGE",
-        timestamp: clientTimestamp,
-        clientTempId: clientTempId,
+        clientTempId,
       };
+      // Optimistically add to privateChats
       setPrivateChats((prevMap) => {
         const newMap = new Map(prevMap);
         const messages = newMap.get(tab) || [];
         newMap.set(tab, [...messages, { ...chatMessage, isOptimistic: true }]);
         return newMap;
       });
-      stompClient.send(`/user/${tab}/private`, {}, JSON.stringify(chatMessage));
+      stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
       setUserData((prev) => ({ ...prev, message: "" }));
     }
   };
@@ -372,21 +385,20 @@ const ChatRoom = ({ user }) => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isUserListOpen]);
 
-  // Fetch previous public messages only once on login
+  // Only fetch public messages from backend on login (when WebSocket is not yet connected)
   useEffect(() => {
-    if (userData.username) {
+    if (userData.username && !userData.connected) {
       fetch("/api/messages/group?roomId=1")
         .then((res) => res.json())
         .then((messages) => {
-          setPublicChats(Array.isArray(messages) ? messages : []);
+          setPublicChats(messages);
         });
     }
-    // eslint-disable-next-line
-  }, [userData.username]);
+  }, [userData.username, userData.connected]);
 
+  // Only fetch private messages from backend on login or tab switch (when WebSocket is not yet connected)
   useEffect(() => {
-    // Fetch previous private messages when switching to a private tab
-    if (userData.username && tab !== "CHATROOM") {
+    if (userData.username && !userData.connected && tab !== "CHATROOM") {
       fetch(`/api/messages/private?user1=${userData.username}&user2=${tab}`)
         .then((res) => res.json())
         .then((messages) => {
@@ -397,7 +409,7 @@ const ChatRoom = ({ user }) => {
           });
         });
     }
-  }, [userData.username, tab]);
+  }, [userData.username, tab, userData.connected]);
 
   return (
     <div className="layout">
@@ -573,8 +585,20 @@ const ChatRoom = ({ user }) => {
             <h2>{tab === "CHATROOM" ? "Ahun Chat" : tab}</h2>
           </div>
           <div className="chat-header-icons">
-            <FaPhoneAlt />
-            <FaVideo />
+            <FaPhoneAlt
+              style={{ cursor: "pointer" }}
+              title="Call user"
+              onClick={() => {
+                window.open("tel:+1234567890", "_self");
+              }}
+            />
+            <FaVideo
+              style={{ cursor: "pointer" }}
+              title="Start Google Meet"
+              onClick={() => {
+                window.open("https://meet.google.com/new", "_blank");
+              }}
+            />
             <MdMoreVert />
           </div>
         </div>
@@ -639,11 +663,21 @@ const ChatRoom = ({ user }) => {
                       <p className="message-text">{chat.message}</p>
                       <div className="message-metadata">
                         <span className="message-timestamp">
-                          {chat.timestamp
-                            ? new Date(chat.timestamp).toLocaleTimeString([], {
+                          {chat.date
+                            ? new Date(chat.date).toLocaleTimeString("en-US", {
                                 hour: "2-digit",
                                 minute: "2-digit",
+                                hour12: true,
                               })
+                            : chat.timestamp
+                            ? new Date(chat.timestamp).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }
+                              )
                             : ""}
                         </span>
                         {chat.senderName === userData.username && (
@@ -860,10 +894,20 @@ const ChatRoom = ({ user }) => {
             </div>
           </div>
           <div className="action-buttons-bar">
-            <button className="action-button active" title="Call">
+            <button
+              className="action-button active"
+              title="Call"
+              onClick={() => window.open("tel:+1234567890", "_self")}
+            >
               <FaPhoneAlt />
             </button>
-            <button className="action-button" title="Video Call">
+            <button
+              className="action-button"
+              title="Video Call"
+              onClick={() =>
+                window.open("https://meet.google.com/new", "_blank")
+              }
+            >
               <FaVideo />
             </button>
             <button className="action-button" title="Add Members">
