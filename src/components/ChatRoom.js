@@ -45,6 +45,8 @@ const ChatRoom = ({ user }) => {
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     if (user?.username) {
@@ -151,12 +153,34 @@ const ChatRoom = ({ user }) => {
     }
   };
 
+  const addNotification = (notif) => {
+    setNotifications((prev) => {
+      if (notif.id) {
+        if (prev.some((n) => n.id === notif.id && n.type === notif.type))
+          return prev;
+      } else {
+        if (
+          prev.some((n) => n.message === notif.message && n.type === notif.type)
+        )
+          return prev;
+      }
+      return [notif, ...prev].slice(0, 30);
+    });
+  };
+
   const onMessageReceived = (payload) => {
     var payloadData = JSON.parse(payload.body);
     const rawMessageBody = payload.body;
 
     switch (payloadData.status) {
       case "JOIN":
+        addNotification({
+          type: "join",
+          user: payloadData.senderName,
+          time: new Date().toISOString(),
+          message: `${payloadData.senderName} joined the chat.`,
+          id: payloadData.id || undefined,
+        });
         if (!privateChats.get(payloadData.senderName)) {
           setPrivateChats((prev) => {
             const newMap = new Map(prev);
@@ -186,6 +210,13 @@ const ChatRoom = ({ user }) => {
         });
         break;
       case "LEAVE":
+        addNotification({
+          type: "leave",
+          user: payloadData.senderName,
+          time: new Date().toISOString(),
+          message: `${payloadData.senderName} left the chat.`,
+          id: payloadData.id || undefined,
+        });
         setOnlineUsers((prev) =>
           prev.filter((user) => user !== payloadData.senderName)
         );
@@ -265,6 +296,16 @@ const ChatRoom = ({ user }) => {
       newMap.set(chatKey, messages);
       return newMap;
     });
+    if (payloadData.senderName !== userData.username) {
+      addNotification({
+        type: "private-message",
+        user: payloadData.senderName,
+        time:
+          payloadData.date || payloadData.timestamp || new Date().toISOString(),
+        message: `New private message from ${payloadData.senderName}: ${payloadData.message}`,
+        id: payloadData.id || undefined,
+      });
+    }
   };
 
   const handleMessage = (event) => {
@@ -285,7 +326,6 @@ const ChatRoom = ({ user }) => {
         status: "MESSAGE",
         clientTempId,
       };
-      // Optimistically add to publicChats
       setPublicChats((prev) => [
         ...prev,
         { ...chatMessage, isOptimistic: true },
@@ -309,7 +349,6 @@ const ChatRoom = ({ user }) => {
         status: "MESSAGE",
         clientTempId,
       };
-      // Optimistically add to privateChats
       setPrivateChats((prevMap) => {
         const newMap = new Map(prevMap);
         const messages = newMap.get(tab) || [];
@@ -321,10 +360,11 @@ const ChatRoom = ({ user }) => {
     }
   };
 
-  const getAvatarUrl = (username) => {
-    if (!username) {
+  const getAvatarUrl = (usernameOrId) => {
+    if (!usernameOrId) {
       return `https://ui-avatars.com/api/?name=?&background=cccccc&color=fff&size=48`;
     }
+    const str = String(usernameOrId);
     const stringToColor = (str) => {
       let hash = 0;
       for (let i = 0; i < str.length; i++) {
@@ -338,8 +378,8 @@ const ChatRoom = ({ user }) => {
       }
       return color;
     };
-    const firstLetter = username.charAt(0).toUpperCase();
-    const bgColor = stringToColor(username).substring(1);
+    const firstLetter = str.charAt(0).toUpperCase();
+    const bgColor = stringToColor(str).substring(1);
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(
       firstLetter
     )}&background=${bgColor}&color=fff&size=48&font-size=0.5&bold=true`;
@@ -360,65 +400,54 @@ const ChatRoom = ({ user }) => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isUserListOpen]);
 
-  // Only fetch public messages from backend on login (when WebSocket is not yet connected)
   useEffect(() => {
     if (userData.username && !userData.connected) {
       fetch("/api/messages/group?roomId=1")
         .then((res) => res.json())
         .then((messages) => {
-          // Map messages to include senderName, message, date, and receiverName
+          console.log("[REST API] Group messages:", messages);
           setPublicChats(
-            Array.isArray(messages)
-              ? messages.map((msg) => ({
-                  senderName: msg.senderName,
-                  message: msg.message,
-                  date: msg.date || msg.timestamp,
-                  receiverName: msg.receiverName,
-                  status: msg.status || "MESSAGE",
-                }))
-              : []
+            (Array.isArray(messages) ? messages : []).map((msg) => ({
+              senderName: msg.sender_name || msg.sender_id,
+              receiverName: msg.receiver_name || msg.receiver_id,
+              message: msg.message,
+              date: msg.sent_at,
+              status: msg.status || "MESSAGE",
+              id: msg.id,
+              fileId: msg.file_id,
+              isRight: msg.sender_id === userData.userId,
+            }))
           );
         });
     }
-  }, [userData.username, userData.connected]);
+  }, [userData.username, userData.connected, userData.userId]);
 
-  // Only fetch private messages from backend on login or tab switch (when WebSocket is not yet connected)
   useEffect(() => {
     if (userData.username && tab !== "CHATROOM") {
       fetch(`/api/messages/private?user1=${userData.username}&user2=${tab}`)
         .then((res) => res.json())
         .then((messages) => {
+          console.log("[REST API] Private messages:", messages);
           setPrivateChats((prev) => {
             const newMap = new Map(prev);
-            // Avoid duplicate messages: filter out any already present (by date+sender+message)
-            const existing = newMap.get(tab) || [];
-            const existingKeys = new Set(
-              existing.map(
-                (m) => (m.date || m.timestamp || "") + m.senderName + m.message
-              )
-            );
-            const newMessages = (
-              Array.isArray(messages) ? messages : []
-            ).filter((m) => {
-              const key =
-                (m.date || m.timestamp || "") + m.senderName + m.message;
-              return !existingKeys.has(key);
-            });
-            newMap.set(tab, [
-              ...existing,
-              ...newMessages.map((msg) => ({
-                senderName: msg.senderName,
+            const mapped = (Array.isArray(messages) ? messages : []).map(
+              (msg) => ({
+                senderName: msg.sender_name || msg.sender_id,
+                receiverName: msg.receiver_name || msg.receiver_id,
                 message: msg.message,
-                date: msg.date || msg.timestamp,
-                receiverName: msg.receiverName,
+                date: msg.sent_at,
                 status: msg.status || "MESSAGE",
-              })),
-            ]);
+                id: msg.id,
+                fileId: msg.file_id,
+                isRight: msg.receiver_id === userData.userId,
+              })
+            );
+            newMap.set(tab, mapped);
             return newMap;
           });
         });
     }
-  }, [userData.username, tab]);
+  }, [userData.username, tab, userData.userId]);
 
   return (
     <div className="layout">
@@ -642,21 +671,19 @@ const ChatRoom = ({ user }) => {
                 )}
                 {chat.status === "MESSAGE" && (
                   <motion.div
-                    className={`message-bubble ${
-                      chat.senderName === userData.username ? "self" : ""
-                    }`}
+                    className={`message-bubble ${chat.isRight ? "self" : ""}`}
                     initial={{
                       opacity: 0,
-                      x: chat.senderName === userData.username ? 60 : -60,
+                      x: chat.isRight ? 60 : -60,
                     }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{
                       opacity: 0,
-                      x: chat.senderName === userData.username ? 60 : -60,
+                      x: chat.isRight ? 60 : -60,
                     }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
-                    {chat.senderName !== userData.username && (
+                    {!chat.isRight && (
                       <img
                         src={getAvatarUrl(chat.senderName)}
                         alt={chat.senderName}
@@ -665,9 +692,7 @@ const ChatRoom = ({ user }) => {
                     )}
                     <div className="message-content">
                       <div className="message-sender-name">
-                        {chat.senderName !== userData.username
-                          ? chat.senderName
-                          : "You"}
+                        {chat.isRight ? "You" : chat.senderName}
                       </div>
                       <p className="message-text">{chat.message}</p>
                       <div className="message-metadata">
@@ -689,7 +714,7 @@ const ChatRoom = ({ user }) => {
                               )
                             : ""}
                         </span>
-                        {chat.senderName === userData.username && (
+                        {chat.isRight && (
                           <span className="message-status-text">
                             {chat.statusValue === "SEEN" ? (
                               <FaCheckDouble className="message-status-icon seen" />
@@ -702,7 +727,7 @@ const ChatRoom = ({ user }) => {
                         )}
                       </div>
                     </div>
-                    {chat.senderName === userData.username && (
+                    {chat.isRight && (
                       <img
                         src={getAvatarUrl(chat.senderName)}
                         alt={chat.senderName}
@@ -894,7 +919,65 @@ const ChatRoom = ({ user }) => {
             />
             <div className="header-icon-group">
               <FaCog />
-              <FaBell />
+              <div style={{ position: "relative" }}>
+                <FaBell
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setShowNotifications((v) => !v)}
+                />
+                {notifications.length > 0 && (
+                  <span className="notification-badge">
+                    {notifications.length}
+                  </span>
+                )}
+                {showNotifications && (
+                  <div className="notification-dropdown">
+                    <div className="notification-dropdown-header">
+                      Notifications
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">No notifications</div>
+                    ) : (
+                      notifications.map((notif, idx) => (
+                        <div
+                          key={idx}
+                          className={`notification-item notification-${notif.type}`}
+                          style={{
+                            cursor:
+                              notif.type === "private-message"
+                                ? "pointer"
+                                : "default",
+                          }}
+                          onClick={() => {
+                            setShowNotifications(false);
+                            if (notif.type === "private-message") {
+                              setTab(notif.user);
+                            } else if (
+                              notif.type === "join" ||
+                              notif.type === "leave"
+                            ) {
+                              setTab("CHATROOM");
+                            }
+                          }}
+                        >
+                          <span className="notification-user">
+                            {notif.user}
+                          </span>
+                          <span className="notification-message">
+                            {notif.message}
+                          </span>
+                          <span className="notification-time">
+                            {new Date(notif.time).toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <img
                 src={getAvatarUrl(userData.username)}
                 alt={userData.username}

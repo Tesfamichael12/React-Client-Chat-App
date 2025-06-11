@@ -11,17 +11,33 @@ const FileUpload = ({ uploaderId, onUploadSuccess }) => {
 
   const handleUpload = async () => {
     if (!selectedFile) return;
+    console.log("[FileUpload] uploaderId prop:", uploaderId, typeof uploaderId);
+    if (!uploaderId || isNaN(Number(uploaderId))) {
+      alert("User ID is missing or invalid!");
+      setUploading(false);
+      return;
+    }
     setUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("uploaderId", Number(uploaderId));
-
+    formData.append("uploaderId", uploaderId);
+    for (let pair of formData.entries()) {
+      console.log("[FileUpload] FormData:", pair[0], pair[1]);
+    }
     try {
       const response = await fetch("http://localhost:8080/api/files/upload", {
         method: "POST",
         body: formData,
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        alert("Upload failed: " + errText);
+        throw new Error("Upload failed: " + errText);
+      }
       const data = await response.json();
+      if (!data.fileUrl) {
+        alert("Upload succeeded but fileUrl missing in response.");
+      }
       if (onUploadSuccess) onUploadSuccess(data);
       alert("File uploaded successfully!");
       setSelectedFile(null);
